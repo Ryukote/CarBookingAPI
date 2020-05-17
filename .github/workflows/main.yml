@@ -1,0 +1,49 @@
+name: CarBookingAPI Piepline
+
+on: [pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: [ubuntu-latest]
+    
+    steps:
+      - uses: actions/checkout@v2
+        with: 
+          repository: 'ryukote/carbookingapi'
+          fetch-depth: '0'
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 3.1.101
+      - name: Build with dotnet
+        run: dotnet build ./CarBookingAPI/CarBookingAPI.sln --configuration Release
+      - name: Test with dotnet
+        run: dotnet test ./CarBookingAPI/CarBookingAPI.sln
+        
+  pull-request:
+    needs: build-and-test
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Merge Pull Request
+        uses: sudo-bot/action-pull-request-merge@v1.1.0
+        with:
+          github-token: "${{ secrets.TOKEN }}"
+          number: ${{ github.event.pull_request.number }}
+          merge-method: merge
+          merge-title: "Merge #${{ github.event.pull_request.number }}"
+          merge-message: "Merge #${{ github.event.pull_request.number }}"
+          
+  docker: 
+    needs: pull-request
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: 'ryukote/carbookingapi'
+          fetch-depth: 0
+      - name: Building Docker image
+        run: docker build -t carbookingapi ./CarBookingAPI/CarBookingAPI
+      - name: Tag Docker image
+        run: docker tag carbookingapi docker.ryukote.info/carbookingapi
+      - name: Deploying image to registry
+        run: docker push docker.ryukote.info/carbookingapi
